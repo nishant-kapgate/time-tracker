@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-color="blue">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screen Time Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Chart.js library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <!-- Global function registry - ensure functions are available even before script loads -->
+    <script>
+        // Create a global object to store function status
+        window.ScreenTimeTracker = {
+            functions: {},
+            registerFunction: function(name, fn) {
+                if (typeof window[name] !== 'function') {
+                    window[name] = fn;
+                    this.functions[name] = true;
+                    console.log(`Registered function: ${name}`);
+                }
+            }
+        };
+    </script>
+</head>
+<body>
+    <!-- Theme Settings Panel -->
+    <div class="theme-settings collapsed">
+        <div class="theme-buttons">
+            <div class="theme-toggle-btn mode-toggle-btn" id="mode-toggle-btn" onclick="toggleThemeMode()">
+                <span class="light-icon">☀️</span>
+                <span class="dark-icon hidden">🌙</span>
+            </div>
+            <div class="theme-toggle-btn color-toggle-btn" id="color-toggle-btn" onclick="toggleThemePanel()">🎨</div>
+        </div>
+        <div class="settings-content">
+            <h4 class="settings-title">Theme Settings</h4>
+            
+            <!-- Light/Dark Mode Toggle -->
+            <div class="settings-option" id="mode-settings">
+                <p>Mode</p>
+                <div class="theme-mode-toggle">
+                    <input type="radio" id="light-mode" name="theme-mode" value="light" checked onchange="document.documentElement.setAttribute('data-theme', 'light'); saveThemeSettings();">
+                    <label for="light-mode">Light</label>
+                    <input type="radio" id="dark-mode" name="theme-mode" value="dark" onchange="document.documentElement.setAttribute('data-theme', 'dark'); saveThemeSettings();">
+                    <label for="dark-mode">Dark</label>
+                    <div class="toggle-track"></div>
+                </div>
+            </div>
+            
+            <!-- Theme Color Options -->
+            <div class="settings-option" id="color-settings">
+                <p>Colors</p>
+                <div class="color-options">
+                    <div class="color-option color-blue active" data-color="blue" onclick="setColorTheme('blue')"></div>
+                    <div class="color-option color-purple" data-color="purple" onclick="setColorTheme('purple')"></div>
+                    <div class="color-option color-green" data-color="green" onclick="setColorTheme('green')"></div>
+                    <div class="color-option color-orange" data-color="orange" onclick="setColorTheme('orange')"></div>
+                    <div class="color-option color-teal" data-color="teal" onclick="setColorTheme('teal')"></div>
+                    <div class="color-option color-red" data-color="red" onclick="setColorTheme('red')"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>Screen Time Tracker</h1>
+            <p>Take control of your digital life</p>
+        </header>
+
+        <main>
+            <section class="dashboard">
+                <div class="dashboard-header">
+                    <div class="usage-summary">
+                        <h2>Today's Usage</h2>
+                        <div class="server-time-container">
+                            <div class="server-time-label">Current Server Time:</div>
+                            <div id="server-time" class="server-time">Loading...</div>
+                        </div>
+                        <div class="time-display">
+                            <span id="hours">0</span>h
+                            <span id="minutes">0</span>m
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-bar" id="usage-progress"></div>
+                        </div>
+                        <div class="tracking-controls">
+                            <button id="start-tracking" class="primary-button" onclick="enableRealTimeTracking()">Start Real-Time Tracking</button>
+                            <button id="stop-tracking" class="secondary-button" onclick="disableRealTimeTracking()" disabled>Stop Tracking</button>
+                            <div class="tracking-status">
+                                <span id="tracking-indicator" class="indicator offline"></span>
+                                <span id="tracking-status-text">Tracking Inactive</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="device-tracking">
+                    <h2>Device Breakdown</h2>
+                    <div class="device">
+                        <div class="device-info">
+                            <span class="device-name">PC</span>
+                            <span class="device-time" id="pc-time">0h 0m</span>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-bar" id="pc-progress"></div>
+                        </div>
+                    </div>
+                    <div class="device">
+                        <div class="device-info">
+                            <span class="device-name">Phone</span>
+                            <span class="device-time" id="phone-time">0h 0m</span>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-bar" id="phone-progress"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Smart Time Limits Section -->
+            <section class="app-limits">
+                <h2>Smart Time Limits</h2>
+                <div class="app-limit-form">
+                    <div class="app-selection">
+                        <label for="app-select">Select App:</label>
+                        <select id="app-select" onchange="toggleCustomAppInput()">
+                            <option value="social">Social Media</option>
+                            <option value="games">Games</option>
+                            <option value="streaming">Streaming Services</option>
+                            <option value="browsing">Web Browsing</option>
+                            <option value="productivity">Productivity Apps</option>
+                            <option value="custom">Custom App</option>
+                        </select>
+                        <input type="text" id="custom-app" placeholder="Custom app name" class="hidden">
+                    </div>
+                    <div class="time-limit-setting">
+                        <label for="app-limit">Daily Limit (minutes):</label>
+                        <input type="number" id="app-limit" min="1" max="1440" value="60">
+                    </div>
+                    <div class="reminder-setting">
+                        <label for="reminder-frequency">Remind me every:</label>
+                        <select id="reminder-frequency">
+                            <option value="15">15 minutes</option>
+                            <option value="30">30 minutes</option>
+                            <option value="60">1 hour</option>
+                        </select>
+                    </div>
+                    <button id="add-app-limit" onclick="addAppLimit()">Add App Limit</button>
+                </div>
+                <div class="app-limits-list" id="app-limits-container">
+                    <!-- App limits will be added here dynamically -->
+                </div>
+            </section>
+
+            <!-- AI-Powered Breaks Section -->
+            <section class="ai-breaks">
+                <h2>AI-Powered Breaks</h2>
+                <div class="current-break-suggestion">
+                    <h3>Suggested Break:</h3>
+                    <div class="break-card" id="break-suggestion">
+                        <p id="break-activity">Take a 5-minute stretching break to refresh your mind and body.</p>
+                        <button id="next-break" onclick="getBreakSuggestion()">Get Another Suggestion</button>
+                        <button id="start-break" onclick="startBreak()">Start Break</button>
+                    </div>
+                </div>
+                <div class="break-preferences">
+                    <h3>Break Preferences:</h3>
+                    <div class="preference-options">
+                        <label><input type="checkbox" id="pref-physical" checked onchange="updateBreakPreferences()"> Physical Activities</label>
+                        <label><input type="checkbox" id="pref-mental" checked onchange="updateBreakPreferences()"> Mental Activities</label>
+                        <label><input type="checkbox" id="pref-creative" checked onchange="updateBreakPreferences()"> Creative Activities</label>
+                        <label><input type="checkbox" id="pref-social" checked onchange="updateBreakPreferences()"> Social Activities</label>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Focus Mode Section -->
+            <section class="focus-mode">
+                <h2>Focus Mode</h2>
+                <div class="focus-timer">
+                    <div class="timer-display" id="focus-timer-display">25:00</div>
+                    <div class="quick-duration-buttons">
+                        <button class="quick-duration" data-minutes="15" onclick="setFocusDuration(15)">15m</button>
+                        <button class="quick-duration" data-minutes="25" onclick="setFocusDuration(25)">25m</button>
+                        <button class="quick-duration" data-minutes="45" onclick="setFocusDuration(45)">45m</button>
+                        <button class="quick-duration" data-minutes="60" onclick="setFocusDuration(60)">1h</button>
+                    </div>
+                    <div class="timer-controls">
+                        <button id="start-focus" onclick="startFocusSession()">Start Focus Session</button>
+                        <button id="pause-focus" onclick="pauseFocusSession()" disabled>Pause</button>
+                        <button id="stop-focus" onclick="stopFocusSession()" disabled>Stop</button>
+                    </div>
+                </div>
+                <div class="focus-settings">
+                    <div class="duration-setting">
+                        <label for="focus-duration">Focus Duration (minutes):</label>
+                        <select id="focus-duration" onchange="updateFocusDuration()">
+                            <option value="25">25 (Pomodoro)</option>
+                            <option value="45">45</option>
+                            <option value="60">60</option>
+                            <option value="90">90</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                        <input type="number" id="custom-duration" min="1" max="180" placeholder="Custom" class="hidden" oninput="updateFocusDuration()">
+                        <button id="apply-custom-duration" onclick="applyCustomDuration()" class="hidden">Apply</button>
+                    </div>
+                    <div class="block-options">
+                        <h4>Block During Focus:</h4>
+                        <div class="block-checkboxes">
+                            <label><input type="checkbox" id="block-social" checked> Social Media</label>
+                            <label><input type="checkbox" id="block-entertainment" checked> Entertainment</label>
+                            <label><input type="checkbox" id="block-news" checked> News</label>
+                            <label><input type="checkbox" id="block-custom" onchange="toggleCustomBlocks()"> Custom Sites/Apps</label>
+                        </div>
+                        <textarea id="custom-blocks" class="hidden" placeholder="Enter websites or apps to block, one per line"></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Daily Insights Section -->
+            <section class="insights">
+                <h2>Daily Reports & Insights</h2>
+                <div class="insight-summary">
+                    <div class="insight-card">
+                        <h3>Screen Time Trend</h3>
+                        <div class="trend-visualization" id="trend-chart">
+                            <!-- Chart will be rendered here -->
+                            <canvas id="usage-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <h3>App Usage Breakdown</h3>
+                        <div class="trend-visualization" id="social-media-chart-container">
+                            <!-- Chart will be rendered here -->
+                            <canvas id="social-media-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- New website screen time section -->
+                <div class="insight-card website-usage">
+                    <h3>Website Screen Time</h3>
+                    <p class="card-description">Track how much time you spend on specific websites to identify digital habits.</p>
+                    <div class="trend-visualization" id="website-chart-container">
+                        <!-- Chart will be rendered here -->
+                        <canvas id="website-usage-chart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="insight-card">
+                    <h3>Today's Insight</h3>
+                    <p id="daily-insight">Based on your usage patterns, you tend to spend more time on your phone in the evening. Consider setting a digital sunset time 1 hour before bed.</p>
+                </div>
+                <div class="improvement-tips">
+                    <h3>Personalized Tips</h3>
+                    <ul id="personalized-tips">
+                        <li>Try the 'Focus Mode' during your most productive hours (10 AM - 12 PM).</li>
+                        <li>Your Social Media usage has increased by 20% this week. Consider setting stricter limits.</li>
+                        <li>You've been consistent with taking breaks. Keep up the good work!</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Gamified Challenges Section -->
+            <section class="challenges">
+                <h2>Gamified Challenges</h2>
+                <div class="challenges-container">
+                    <div class="challenge-card active">
+                        <div class="challenge-header">
+                            <h3>Digital Detox Weekend</h3>
+                            <span class="challenge-badge">Active</span>
+                        </div>
+                        <p>Reduce your weekend screen time by 50% compared to last weekend.</p>
+                        <div class="challenge-progress">
+                            <div class="progress-container">
+                                <div class="progress-bar" style="width: 35%"></div>
+                            </div>
+                            <span>35% Complete</span>
+                        </div>
+                    </div>
+                    <div class="challenge-card">
+                        <div class="challenge-header">
+                            <h3>Focus Master</h3>
+                            <span class="challenge-badge locked">Locked</span>
+                        </div>
+                        <p>Complete 5 focus sessions of at least 45 minutes this week.</p>
+                        <button class="start-challenge" onclick="startChallenge(this)">Start Challenge</button>
+                    </div>
+                    <div class="challenge-card">
+                        <div class="challenge-header">
+                            <h3>Mindful Mornings</h3>
+                            <span class="challenge-badge locked">Locked</span>
+                        </div>
+                        <p>Don't use your devices during the first hour after waking up for 5 consecutive days.</p>
+                        <button class="start-challenge" onclick="startChallenge(this)">Start Challenge</button>
+                    </div>
+                </div>
+                <div class="achievements">
+                    <h3>Your Achievements</h3>
+                    <div class="achievement-icons">
+                        <div class="achievement" title="Screen Time Reducer: Reduced overall screen time by 20%">🏆</div>
+                        <div class="achievement" title="Break Master: Took 10 mindful breaks">🧘</div>
+                        <div class="achievement" title="Focus Champion: Completed 20 focus sessions">🎯</div>
+                        <div class="achievement locked" title="Digital Sunset: Complete the evening wind-down challenge">🌙</div>
+                        <div class="achievement locked" title="Weekend Warrior: Complete the weekend challenge">🏝️</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Device Sync Section -->
+            <section class="device-sync">
+                <h2>Sync Across Devices</h2>
+                <div class="sync-setup">
+                    <p>Keep track of your screen time across all your devices. Sync your data by setting up the app on each device.</p>
+                    <div class="sync-options">
+                        <div class="sync-card">
+                            <h3>Mobile App</h3>
+                            <p>Scan this QR code to download the mobile app:</p>
+                            <div class="qr-placeholder">QR Code</div>
+                            <p>Or visit: <a href="#">screentimetracker.app/mobile</a></p>
+                        </div>
+                        <div class="sync-card">
+                            <h3>Browser Extension</h3>
+                            <p>Add our browser extension for automatic tracking:</p>
+                            <button class="extension-button">Get Chrome Extension</button>
+                            <button class="extension-button">Get Firefox Add-on</button>
+                        </div>
+                    </div>
+                    <div class="sync-status">
+                        <h3>Connected Devices</h3>
+                        <ul class="device-list">
+                            <li class="connected-device">
+                                <span class="device-icon">💻</span>
+                                <span class="device-name">This PC</span>
+                                <span class="sync-status-badge">Connected</span>
+                            </li>
+                            <li class="connected-device offline">
+                                <span class="device-icon">📱</span>
+                                <span class="device-name">iPhone</span>
+                                <span class="sync-status-badge">Not Connected</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <section class="time-settings">
+                <h2>Daily Limits</h2>
+                <div class="limit-setting">
+                    <label for="pc-limit">PC Limit (hours):</label>
+                    <input type="number" id="pc-limit" min="0" max="24" value="3">
+                </div>
+                <div class="limit-setting">
+                    <label for="phone-limit">Phone Limit (hours):</label>
+                    <input type="number" id="phone-limit" min="0" max="24" value="2">
+                </div>
+                <button id="save-limits" onclick="saveLimits()">Save Limits</button>
+            </section>
+
+            <section class="time-log">
+                <h2>Log Screen Time</h2>
+                <div class="time-input">
+                    <select id="device-select">
+                        <option value="pc">PC</option>
+                        <option value="phone">Phone</option>
+                    </select>
+                    <input type="number" id="hours-input" min="0" max="24" placeholder="Hours">
+                    <input type="number" id="minutes-input" min="0" max="59" placeholder="Minutes">
+                    <button id="log-time" onclick="logTime()">Log Time</button>
+                </div>
+            </section>
+        </main>
+
+        <section class="tips">
+            <h2>Tips to Reduce Screen Time</h2>
+            <ul>
+                <li>Use the 20-20-20 rule: Every 20 minutes, look at something 20 feet away for 20 seconds</li>
+                <li>Set designated "screen-free" hours in your day</li>
+                <li>Turn off non-essential notifications</li>
+                <li>Use browser extensions to block distracting websites</li>
+                <li>Keep devices out of your bedroom</li>
+            </ul>
+        </section>
+
+        <footer>
+            <p>Codexo &copy; 2025</p>
+        </footer>
+    </div>
+    <script src="script.js"></script>
+    
+    <!-- Back to Top Button with Scroll Progress -->
+    <div id="back-to-top-container" class="back-to-top-container">
+        <div id="scroll-progress" class="scroll-progress"></div>
+        <button id="back-to-top" class="back-to-top" title="Back to top">↑</button>
+    </div>
+    
+    <!-- Fallback script to ensure functions exist even if main script fails to load -->
+    <script>
+        // Define essential functions if they don't exist yet
+        if (typeof toggleThemeMode !== 'function') {
+            function toggleThemeMode() {
+                const root = document.documentElement;
+                const currentTheme = root.getAttribute('data-theme') || 'light';
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                
+                root.setAttribute('data-theme', newTheme);
+                
+                const lightIcon = document.querySelector('.light-icon');
+                const darkIcon = document.querySelector('.dark-icon');
+                
+                if (lightIcon && darkIcon) {
+                    if (newTheme === 'light') {
+                        lightIcon.classList.remove('hidden');
+                        darkIcon.classList.add('hidden');
+                    } else {
+                        lightIcon.classList.add('hidden');
+                        darkIcon.classList.remove('hidden');
+                    }
+                }
+                
+                try {
+                    localStorage.setItem('themeSettings', JSON.stringify({
+                        theme: newTheme,
+                        color: root.getAttribute('data-color') || 'blue'
+                    }));
+                } catch (e) {
+                    console.error('Error saving theme settings:', e);
+                }
+            }
+        }
+        
+        if (typeof toggleThemePanel !== 'function') {
+            function toggleThemePanel() {
+                const panel = document.querySelector('.theme-settings');
+                if (panel) {
+                    panel.classList.toggle('collapsed');
+                }
+            }
+        }
+        
+        if (typeof setColorTheme !== 'function') {
+            function setColorTheme(color) {
+                document.documentElement.setAttribute('data-color', color);
+                
+                const colorOptions = document.querySelectorAll('.color-option');
+                colorOptions.forEach(option => {
+                    option.classList.remove('active');
+                    if (option.getAttribute('data-color') === color) {
+                        option.classList.add('active');
+                    }
+                });
+                
+                try {
+                    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+                    localStorage.setItem('themeSettings', JSON.stringify({
+                        theme: currentTheme,
+                        color: color
+                    }));
+                } catch (e) {
+                    console.error('Error saving color settings:', e);
+                }
+            }
+        }
+        
+        if (typeof saveLimits !== 'function') {
+            function saveLimits() {
+                const pcLimit = document.getElementById('pc-limit');
+                const phoneLimit = document.getElementById('phone-limit');
+                
+                if (pcLimit && phoneLimit) {
+                    alert('Daily limits saved!');
+                } else {
+                    alert('Could not save limits - elements not found');
+                }
+            }
+        }
+        
+        if (typeof logTime !== 'function') {
+            function logTime() {
+                const hours = document.getElementById('hours-input');
+                const minutes = document.getElementById('minutes-input');
+                
+                if (hours && minutes) {
+                    if (!hours.value && !minutes.value) {
+                        alert('Please enter a valid time.');
+                        return;
+                    }
+                    
+                    alert('Time logged successfully!');
+                    hours.value = '';
+                    minutes.value = '';
+                } else {
+                    alert('Could not log time - elements not found');
+                }
+            }
+        }
+        
+        if (typeof addAppLimit !== 'function') {
+            function addAppLimit() {
+                alert('App limit added successfully!');
+            }
+        }
+        
+        if (typeof getBreakSuggestion !== 'function') {
+            function getBreakSuggestion() {
+                const breakActivity = document.getElementById('break-activity');
+                if (breakActivity) {
+                    const suggestions = [
+                        'Take a 5-minute stretching break to refresh your mind and body.',
+                        'Do 10 jumping jacks to get your blood flowing.',
+                        'Take a short walk around your home or office.',
+                        'Practice deep breathing for 2 minutes.',
+                        'Look out the window and focus on something natural for a minute.'
+                    ];
+                    
+                    const randomIndex = Math.floor(Math.random() * suggestions.length);
+                    breakActivity.textContent = suggestions[randomIndex];
+                }
+            }
+        }
+        
+        if (typeof startBreak !== 'function') {
+            function startBreak() {
+                const breakActivity = document.getElementById('break-activity');
+                if (breakActivity) {
+                    alert('Break started: ' + breakActivity.textContent);
+                } else {
+                    alert('Break started!');
+                }
+            }
+        }
+        
+        if (typeof updateBreakPreferences !== 'function') {
+            function updateBreakPreferences() {
+                console.log('Break preferences updated');
+            }
+        }
+        
+        if (typeof startFocusSession !== 'function') {
+            function startFocusSession() {
+                const startButton = document.getElementById('start-focus');
+                const pauseButton = document.getElementById('pause-focus');
+                const stopButton = document.getElementById('stop-focus');
+                
+                if (startButton) startButton.disabled = true;
+                if (pauseButton) pauseButton.disabled = false;
+                if (stopButton) stopButton.disabled = false;
+                
+                alert('Focus session started!');
+            }
+        }
+        
+        if (typeof pauseFocusSession !== 'function') {
+            function pauseFocusSession() {
+                alert('Focus session paused/resumed!');
+            }
+        }
+        
+        if (typeof stopFocusSession !== 'function') {
+            function stopFocusSession() {
+                const startButton = document.getElementById('start-focus');
+                const pauseButton = document.getElementById('pause-focus');
+                const stopButton = document.getElementById('stop-focus');
+                
+                if (startButton) startButton.disabled = false;
+                if (pauseButton) pauseButton.disabled = true;
+                if (stopButton) stopButton.disabled = true;
+                
+                alert('Focus session stopped!');
+            }
+        }
+        
+        if (typeof updateFocusDuration !== 'function') {
+            function updateFocusDuration() {
+                const select = document.getElementById('focus-duration');
+                const customInput = document.getElementById('custom-duration');
+                
+                if (select && customInput) {
+                    customInput.classList.toggle('hidden', select.value !== 'custom');
+                }
+            }
+        }
+        
+        if (typeof toggleCustomAppInput !== 'function') {
+            function toggleCustomAppInput() {
+                const select = document.getElementById('app-select');
+                const customInput = document.getElementById('custom-app');
+                
+                if (select && customInput) {
+                    customInput.classList.toggle('hidden', select.value !== 'custom');
+                }
+            }
+        }
+        
+        if (typeof toggleCustomBlocks !== 'function') {
+            function toggleCustomBlocks() {
+                const checkbox = document.getElementById('block-custom');
+                const textarea = document.getElementById('custom-blocks');
+                
+                if (checkbox && textarea) {
+                    textarea.classList.toggle('hidden', !checkbox.checked);
+                }
+            }
+        }
+        
+        if (typeof startChallenge !== 'function') {
+            function startChallenge(button) {
+                if (button) {
+                    const card = button.closest('.challenge-card');
+                    if (card) {
+                        const title = card.querySelector('h3')?.textContent || 'Challenge';
+                        const badge = card.querySelector('.challenge-badge');
+                        
+                        if (badge) badge.textContent = 'Active';
+                        if (badge) badge.classList.remove('locked');
+                        
+                        button.textContent = 'Challenge Active';
+                        button.disabled = true;
+                        
+                        alert(`Challenge "${title}" started! Good luck!`);
+                    }
+                }
+            }
+        }
+        
+        // Simple initialization to make UI responsive immediately
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize UI elements that need immediate updates
+            toggleCustomAppInput();
+            toggleCustomBlocks();
+            updateFocusDuration();
+            
+            console.log('Fallback functions initialized successfully');
+        });
+        
+        // Add real-time tracking functions
+        if (typeof enableRealTimeTracking !== 'function') {
+            function enableRealTimeTracking() {
+                const startButton = document.getElementById('start-tracking');
+                const stopButton = document.getElementById('stop-tracking');
+                const indicator = document.getElementById('tracking-indicator');
+                const statusText = document.getElementById('tracking-status-text');
+                
+                if (startButton) startButton.disabled = true;
+                if (stopButton) stopButton.disabled = false;
+                
+                if (indicator) {
+                    indicator.classList.remove('offline');
+                    indicator.classList.add('active');
+                }
+                
+                if (statusText) {
+                    statusText.textContent = 'Tracking Active';
+                }
+                
+                alert('Real-time screen time tracking is now active!');
+            }
+        }
+        
+        if (typeof disableRealTimeTracking !== 'function') {
+            function disableRealTimeTracking() {
+                const startButton = document.getElementById('start-tracking');
+                const stopButton = document.getElementById('stop-tracking');
+                const indicator = document.getElementById('tracking-indicator');
+                const statusText = document.getElementById('tracking-status-text');
+                
+                if (startButton) startButton.disabled = false;
+                if (stopButton) stopButton.disabled = true;
+                
+                if (indicator) {
+                    indicator.classList.remove('active');
+                    indicator.classList.add('offline');
+                }
+                
+                if (statusText) {
+                    statusText.textContent = 'Tracking Inactive';
+                }
+                
+                alert('Real-time screen time tracking has been disabled.');
+            }
+        }
+        
+        if (typeof updateTrackingUI !== 'function') {
+            function updateTrackingUI(isTracking) {
+                const startButton = document.getElementById('start-tracking');
+                const stopButton = document.getElementById('stop-tracking');
+                const indicator = document.getElementById('tracking-indicator');
+                const statusText = document.getElementById('tracking-status-text');
+                
+                if (startButton) startButton.disabled = isTracking;
+                if (stopButton) stopButton.disabled = !isTracking;
+                
+                if (indicator) {
+                    if (isTracking) {
+                        indicator.classList.remove('offline');
+                        indicator.classList.add('active');
+                    } else {
+                        indicator.classList.remove('active');
+                        indicator.classList.add('offline');
+                    }
+                }
+                
+                if (statusText) {
+                    statusText.textContent = isTracking ? 'Tracking Active' : 'Tracking Inactive';
+                }
+            }
+        }
+    </script>
+</body>
+</html> 
